@@ -2,18 +2,24 @@ import logging
 import asyncio
 import os
 
-from aiogram import Bot, Dispatcher, types, F
+from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
+from aiogram.types import Message
 from dotenv import load_dotenv
+from openai import OpenAI
+from keyboards import start_keyboard
 
 load_dotenv()
-TOKEN = os.getenv("7513387599:AAFbyVW6uHhQP_C2jXdEJP4NkB3XStEu11M")
+TOKEN = "7513387599:AAFbyVW6uHhQP_C2jXdEJP4NkB3XStEu11M"
 
 
 bot = Bot(token="7513387599:AAFbyVW6uHhQP_C2jXdEJP4NkB3XStEu11M")
+OPENAI_API_KEY= os.getenv("OPENAI_API_KEY")
+
+
 dp = Dispatcher()
 
-# включаем логирование
+
 logging.basicConfig(level=logging.INFO)
 
 
@@ -31,8 +37,10 @@ async def send_welcome(message: types.Message):
         "/meeting <класс>\n"
         "А так же для получения информации о школе напишите команду:\n"
         "/info\n"
-        "Примечания букву а так же день недели писать с большой пуквы и с помощью русского языка"
+        "Примечания букву а так же день недели писать с большой буквы и с помощью русского языка"
     )
+
+
 
 @dp.message(Command(commands=["info"]))
 async def send_info(message: types.Message):
@@ -478,11 +486,11 @@ meetings_schedule = {
 
 
 
-# команда для вывода расписания по классу и дню недели
+
 @dp.message(Command(commands=["schedule"]))
 async def get_schedule(message: types.Message):
     try:
-        # разделяем текст сообщения на аргументы
+
         args = message.text.split()
 
         if len(args) < 3:
@@ -492,7 +500,7 @@ async def get_schedule(message: types.Message):
         class_name = args[1]
         day_of_week = args[2]
 
-        # получаем расписание из словаря
+
         if class_name in schedule:
             class_schedule = schedule[class_name]
             if day_of_week in class_schedule:
@@ -512,20 +520,20 @@ async def get_schedule(message: types.Message):
 
 
 
-# команда для получения информации о собрании  класса
+
 @dp.message(Command(commands=["meeting"]))
 async def get_class_meeting(message: types.Message):
     try:
-        # Разделяем текст сообщения на аргументы
+
         args = message.text.split()
 
         if len(args) < 2:
             await message.answer("Пожалуйста, укажите класс. Пример: /meeting 1-А")
             return
 
-        class_name = args[1].upper()  # Преобразуем название класса в верхний регистр
+        class_name = args[1].upper()
 
-        # Проверяем, существует ли класс в расписании собраний
+
         if class_name in meetings_schedule:
             meeting_time = meetings_schedule[class_name]
             await message.answer(f"Собрание для класса {class_name}: {meeting_time}")
@@ -535,6 +543,38 @@ async def get_class_meeting(message: types.Message):
     except Exception as e:
         await message.answer(f"Произошла ошибка: {str(e)}")
 
+@dp.message()
+async def chat_with_ai(message: Message):
+    try:
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=f"{OPENAI_API_KEY}",
+        )
+
+        completion = client.chat.completions.create(
+            model="google/gemma-3-27b-it:free",
+            temperature=1,
+            messages=[
+                    {
+                        "role": "user",
+                        "content": message.text
+                    },
+                    {
+                      "role": "system",
+                      "content": "Ты мой помощник, Твоя роль отвечать на вопросы, чуть ниже я тебе напишу вопрос - ответ,а так же исправляй ошибки при написании команд "
+                                 "если что используй их"
+                                 "Количество учеников - 2528"
+                                 "Количество учителей - 87"
+                                 "Директор - Бахтияр Кадыров"
+
+
+                  }
+                ]
+            )
+        reply_text = completion.choices[0].message.content
+        await message.answer(reply_text)
+    except Exception as e:
+        print(e)
 
 async def main():
     print("Bot started...")
